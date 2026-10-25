@@ -21,7 +21,6 @@ st.markdown("Upload your data, extract receipts with AI, detect anomalies, and p
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2830/2830284.png", width=80) # Placeholder logo
     st.header("1. Upload Data")
     csv_file = st.file_uploader("Historical Data (CSV)", type="csv")
     image_file = st.file_uploader("New Receipt (Image)", type=["jpg", "png"])
@@ -30,11 +29,22 @@ with st.sidebar:
         raw_df = pd.read_csv(csv_file)
         
         st.header("2. Map Columns")
-        st.info("Tell the AI which columns to use.")
+        st.info("Tell the AI which columns to use. Select 3 DIFFERENT columns.")
         date_col = st.selectbox("Date Column", raw_df.columns)
         amount_col = st.selectbox("Amount Column", raw_df.columns)
         cat_col = st.selectbox("Category Column", raw_df.columns)
         
+        # --- PREVENT THE CRASH ---
+        if date_col == amount_col or date_col == cat_col or amount_col == cat_col:
+            st.error("⚠️ Error: Please select 3 different columns. You selected the same column multiple times.")
+            st.stop() # Stops the app from running the rest of the code
+
+        # --- FILTER INCOME VS EXPENSE ---
+        # Your CSV has a 'transaction_type' column. We only want 'Expense' for this app.
+        if 'transaction_type' in raw_df.columns:
+            raw_df = raw_df[raw_df['transaction_type'].str.lower() == 'expense']
+            st.success("Filtered dataset to only include 'Expense' transactions.")
+
         st.header("3. Settings")
         contamination = st.slider("Anomaly Sensitivity", 0.01, 0.20, 0.05, help="Higher means more items are flagged as anomalies.")
 
@@ -113,10 +123,10 @@ if csv_file:
         
         if not anomalies.empty:
             st.warning(f"Found {len(anomalies)} unusual transactions based on Isolation Forest.")
-            st.dataframe(anomalies[['date', 'merchant', 'amount', 'category']], use_container_width=True)
+            st.dataframe(anomalies[['date', 'merchant', 'amount', 'category']] if 'merchant' in df.columns else anomalies[['date', 'amount', 'category']], use_container_width=True)
             
             # Bar chart of anomalies
-            fig_anom = px.bar(anomalies, x='date', y='amount', color='merchant', title="Anomaly Timeline")
+            fig_anom = px.bar(anomalies, x='date', y='amount', color='merchant' if 'merchant' in df.columns else 'category', title="Anomaly Timeline")
             st.plotly_chart(fig_anom, use_container_width=True)
         else:
             st.success("No anomalies detected in this dataset.")
@@ -135,6 +145,5 @@ if csv_file:
             with st.spinner("Grok is analyzing your data..."):
                 advice = get_grok_advice(summary, prediction if prediction else 0, question)
                 st.info(advice)
-
 else:
     st.info("👈 Please upload a CSV file in the sidebar to get started.")
