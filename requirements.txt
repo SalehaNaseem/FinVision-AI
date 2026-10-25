@@ -1,0 +1,8 @@
+streamlit
+pandas
+scikit-learn
+plotly
+google-generativeai
+openai
+python-dotenv
+opencv-python-headless
